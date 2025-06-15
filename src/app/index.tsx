@@ -1,95 +1,133 @@
-import { Link } from "expo-router";
-import React from "react";
-import { Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import React, { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity } from "react-native";
+import { useAudioPlayer } from "expo-audio";
+import Navbar from "./ui/navbar";
+import { Icon } from "@iconify/react";
 
-export default function Page() {
+const MusicPlayer = () => {
+  const currentSong = {
+    title: "Aiport Lady",
+    artist: "Ai furihata",
+    duration: "3:45",
+    currentTime: "1:23",
+    progress: 0.3,
+  };
+
+  const player = useAudioPlayer(require("../assets/aiport_lady.mp3"));
+
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState<number>(0);
+  const [canRepeat, setCanRepeat] = useState<boolean>(false);
+
+  const formatTime = (time) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (player && player.duration && !player.paused && Number(player.currentStatus) !== Number(player.currentTime)) {
+        setCurrentTime(player.currentTime);
+        setDuration(player.duration);
+        setProgress(player.currentTime / player.duration);
+      }
+
+      if (player.duration === player.currentTime) {
+        if (canRepeat) {
+          player.play();
+        }
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleCanRepeat = () => {
+    setCanRepeat(!canRepeat);
+  };
+
+  const handlePlayPause = () => {
+    if (player.paused) {
+      player.play();
+      setIsPlaying(true);
+    } else {
+      player.pause();
+      setIsPlaying(false);
+    }
+  };
+
   return (
-    <View className="flex flex-1">
-      <Header />
-      <Content />
-      <Footer />
-    </View>
-  );
-}
-
-function Content() {
-  return (
-    <View className="flex-1">
-      <View className="py-12 md:py-24 lg:py-32 xl:py-48">
-        <View className="px-4 md:px-6">
-          <View className="flex flex-col items-center gap-4 text-center">
-            <Text
-              role="heading"
-              className="text-3xl text-center native:text-5xl  font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl"
-            >
-              Welcome to Project ACME
-            </Text>
-            <Text className="mx-auto max-w-[700px] text-lg text-center text-gray-500 md:text-xl dark:text-gray-400">
-              Discover and collaborate on acme. Explore our services now.
-            </Text>
-
-            <View className="gap-4">
-              <Link
-                suppressHighlighting
-                className="flex h-9 items-center justify-center overflow-hidden rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-gray-50 web:shadow ios:shadow transition-colors hover:bg-gray-900/90 active:bg-gray-400/90 web:focus-visible:outline-none web:focus-visible:ring-1 focus-visible:ring-gray-950 disabled:pointer-events-none disabled:opacity-50 dark:bg-gray-50 dark:text-gray-900 dark:hover:bg-gray-50/90 dark:focus-visible:ring-gray-300"
-                href="/"
-              >
-                Explore
-              </Link>
-            </View>
-          </View>
-        </View>
+    <View className="bg-gradient-to-br from-gray-900 to-gray-800 backdrop-blur-md h-full flex items-center justify-center px-6">
+      <Navbar />
+      {/* Portada del álbum */}
+      <View className="w-80 h-72 rounded-xl overflow-hidden shadow-lg flex justify-center items-center shadow-blue-500/20 border border-gray-700">
+        <Icon icon="mingcute:music-2-fill" width="54" height="54" color="white" />
+        <View className="absolute inset-0 bg-black/30" />
       </View>
-    </View>
-  );
-}
 
-function Header() {
-  const { top } = useSafeAreaInsets();
-  return (
-    <View style={{ paddingTop: top }}>
-      <View className="px-4 lg:px-6 h-14 flex items-center flex-row justify-between ">
-        <Link className="font-bold flex-1 items-center justify-center" href="/">
-          ACME
-        </Link>
-        <View className="flex flex-row gap-4 sm:gap-6">
-          <Link
-            className="text-md font-medium hover:underline web:underline-offset-4"
-            href="/"
-          >
-            About
-          </Link>
-          <Link
-            className="text-md font-medium hover:underline web:underline-offset-4"
-            href="/"
-          >
-            Product
-          </Link>
-          <Link
-            className="text-md font-medium hover:underline web:underline-offset-4"
-            href="/"
-          >
-            Pricing
-          </Link>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function Footer() {
-  const { bottom } = useSafeAreaInsets();
-  return (
-    <View
-      className="flex shrink-0 bg-gray-100 native:hidden"
-      style={{ paddingBottom: bottom }}
-    >
-      <View className="py-6 flex-1 items-start px-4 md:px-6 ">
-        <Text className={"text-center text-gray-700"}>
-          © {new Date().getFullYear()} Me
+      {/* Información de la canción */}
+      <View className="my-8 items-center w-full">
+        <Text className="text-blue-300  font-light uppercase text-xs tracking-wider">
+          {currentSong.artist}
+        </Text>
+        <Text className="text-white text-2xl font-bold mt-1 text-center">
+          {currentSong.title}
         </Text>
       </View>
+
+      {/* Barra de progreso */}
+      <View className="w-full mb-8">
+        <View className="w-full h-1 bg-gray-700 rounded-full overflow-hidden">
+          <View
+            className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </View>
+        <View className="flex-row justify-between mt-2">
+          <Text className="text-gray-400 text-xs">
+            {formatTime(currentTime)}
+          </Text>
+          <Text className="text-gray-400 text-xs">
+            {formatTime(duration - currentTime)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Controles */}
+      <View className="flex-row items-center justify-center gap-5">
+        <TouchableOpacity className="p-3" onPress={handleCanRepeat}>
+          <Icon icon={`mingcute:${!canRepeat ? "repeat-line" : "repeat-one-line"}`} color="white" width="24" height="24" />
+        </TouchableOpacity>
+
+        <TouchableOpacity className="p-3">
+          <Icon color="white" icon="fe:fast-backward" width="24" height="24" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          className="bg-gradient-to-t from-blue-600 to-blue-500 px-4 py-4 rounded-full shadow-lg shadow-blue-500/50"
+          onPress={handlePlayPause}
+        >
+          <Icon
+            icon={`mingcute:${isPlaying ? "pause-fill" : "play-fill"}`}
+            width="24"
+            height="24"
+            color="white"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity className="p-3">
+          <Icon color="white" icon="fe:fast-forward" width="24" height="24" />
+        </TouchableOpacity>
+
+        <TouchableOpacity className="p-3">
+          <Icon icon="mingcute:volume-mute-line" width="24" height="24" color="white" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
-}
+};
+
+export default MusicPlayer;

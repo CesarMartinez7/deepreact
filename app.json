@@ -12,7 +12,8 @@
         {
           "origin": "https://n"
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "name": "deepreact",
     "slug": "deepreact"
