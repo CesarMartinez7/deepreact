@@ -1,133 +1,121 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity } from "react-native";
-import { useAudioPlayer } from "expo-audio";
-import Navbar from "./ui/navbar";
-import { Icon } from "@iconify/react";
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Platform, PermissionsAndroid } from 'react-native';
+import * as MediaLibrary from 'expo-media-library';
+import { Audio } from 'expo-av';
 
-const MusicPlayer = () => {
-  const currentSong = {
-    title: "Aiport Lady",
-    artist: "Ai furihata",
-    duration: "3:45",
-    currentTime: "1:23",
-    progress: 0.3,
-  };
+export default function MusicPlayer() {
+  const [songs, setSongs] = useState([]);
+  const [currentSound, setCurrentSound] = useState(null);
+  const [permissionGranted, setPermissionGranted] = useState(false);
 
-  const player = useAudioPlayer(require("../assets/aiport_lady.mp3"));
-
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState<number>(0);
-  const [canRepeat, setCanRepeat] = useState<boolean>(false);
-
-  const formatTime = (time) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-  };
-
+  // 1. Solicitar permisos correctamente
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (player && player.duration && !player.paused && Number(player.currentStatus) !== Number(player.currentTime)) {
-        setCurrentTime(player.currentTime);
-        setDuration(player.duration);
-        setProgress(player.currentTime / player.duration);
+    const requestPermissions = async () => {
+      if (Platform.OS === 'android') {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+          {
+            title: 'Permiso de almacenamiento',
+            message: 'La app necesita acceso a tus archivos de audio',
+            buttonPositive: 'Aceptar'
+          }
+        );
+        setPermissionGranted(granted === PermissionsAndroid.RESULTS.GRANTED);
+      } else {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        setPermissionGranted(status === 'granted');
       }
+    };
 
-      if (player.duration === player.currentTime) {
-        if (canRepeat) {
-          player.play();
-        }
-      }
-    }, 500);
-
-    return () => clearInterval(interval);
+    requestPermissions();
   }, []);
 
-  const handleCanRepeat = () => {
-    setCanRepeat(!canRepeat);
-  };
+  // 2. Cargar música solo con permisos
+  useEffect(() => {
+    if (permissionGranted) {
+      loadMusic();
+    }
+    return () => {
+      if (currentSound) {
+        currentSound.unloadAsync();
+      }
+    };
+  }, [permissionGranted]);
 
-  const handlePlayPause = () => {
-    if (player.paused) {
-      player.play();
-      setIsPlaying(true);
-    } else {
-      player.pause();
-      setIsPlaying(false);
+  const loadMusic = async () => {
+    try {
+      const media = await MediaLibrary.getAssetsAsync({
+        mediaType: 'audio',
+        first: 100, // Limitar resultados para mejor performance
+      });
+      setSongs(media.assets);
+    } catch (error) {
+      console.error('Error cargando música:', error);
     }
   };
 
+  const playSong = async (uri) => {
+    try {
+      if (currentSound) {
+        await currentSound.unloadAsync();
+      }
+      
+      const { sound } = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: true }
+      );
+      setCurrentSound(sound);
+      
+      // Configurar para reproducción en segundo plano
+      await Audio.setAudioModeAsync({
+        staysActiveInBackground: true,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+      });
+    } catch (error) {
+      console.error('Error reproduciendo:', error);
+    }
+  };
+
+  // 3. Manejar estado de permisos
+  if (!permissionGranted) {
+    return (
+      <View className='text-center text-white m-auto'>
+        <Text className='text-center text-white'>Se necesitan permisos para acceder a la música</Text>
+      </View>
+    );
+  }
+
+  // 4. Renderizado principal
   return (
-    <View className="bg-gradient-to-br from-gray-900 to-gray-800 backdrop-blur-md h-full flex items-center justify-center px-6">
-      <Navbar />
-      {/* Portada del álbum */}
-      <View className="w-80 h-72 rounded-xl overflow-hidden shadow-lg flex justify-center items-center shadow-blue-500/20 border border-gray-700">
-        <Icon icon="mingcute:music-2-fill" width="54" height="54" color="white" />
-        <View className="absolute inset-0 bg-black/30" />
-      </View>
-
-      {/* Información de la canción */}
-      <View className="my-8 items-center w-full">
-        <Text className="text-blue-300  font-light uppercase text-xs tracking-wider">
-          {currentSong.artist}
-        </Text>
-        <Text className="text-white text-2xl font-bold mt-1 text-center">
-          {currentSong.title}
-        </Text>
-      </View>
-
-      {/* Barra de progreso */}
-      <View className="w-full mb-8">
-        <View className="w-full h-1 bg-gray-700 rounded-full overflow-hidden">
-          <View
-            className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
-            style={{ width: `${progress * 100}%` }}
-          />
-        </View>
-        <View className="flex-row justify-between mt-2">
-          <Text className="text-gray-400 text-xs">
-            {formatTime(currentTime)}
-          </Text>
-          <Text className="text-gray-400 text-xs">
-            {formatTime(duration - currentTime)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Controles */}
-      <View className="flex-row items-center justify-center gap-5">
-        <TouchableOpacity className="p-3" onPress={handleCanRepeat}>
-          <Icon icon={`mingcute:${!canRepeat ? "repeat-line" : "repeat-one-line"}`} color="white" width="24" height="24" />
-        </TouchableOpacity>
-
-        <TouchableOpacity className="p-3">
-          <Icon color="white" icon="fe:fast-backward" width="24" height="24" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          className="bg-gradient-to-t from-blue-600 to-blue-500 px-4 py-4 rounded-full shadow-lg shadow-blue-500/50"
-          onPress={handlePlayPause}
-        >
-          <Icon
-            icon={`mingcute:${isPlaying ? "pause-fill" : "play-fill"}`}
-            width="24"
-            height="24"
-            color="white"
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity className="p-3">
-          <Icon color="white" icon="fe:fast-forward" width="24" height="24" />
-        </TouchableOpacity>
-
-        <TouchableOpacity className="p-3">
-          <Icon icon="mingcute:volume-mute-line" width="24" height="24" color="white" />
-        </TouchableOpacity>
-      </View>
+    <View style={{ flex: 1, padding: 20 }}>
+      {songs.length === 0 ? (
+        <Text>No se encontraron canciones</Text>
+      ) : (
+        <FlatList
+          data={songs}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              onPress={() => playSong(item.uri)}
+              style={{ 
+                padding: 15, 
+                borderBottomWidth: 1,
+                borderBottomColor: '#ddd',
+                flexDirection: 'row',
+                justifyContent: 'space-between'
+              }}
+            >
+              <Text style={{ flex: 1 }} numberOfLines={1}>
+                {item.filename.replace('.mp3', '').replace('.wav', '')}
+              </Text>
+              <Text style={{ color: 'gray' }}>
+                {Math.floor(item.duration / 1000)}s
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </View>
   );
-};
-
-export default MusicPlayer;
+}
